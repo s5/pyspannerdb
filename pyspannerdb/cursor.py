@@ -66,6 +66,9 @@ class Cursor(object):
         sql, params, types = self._format_query(sql, params)
 
         self._last_response = self.connection._run_query(sql, params, types)
+        if "_lastrowid" in self._last_response:
+            self._lastrowid = self._last_response["_lastrowid"]
+
         self._iterator = iter(self._last_response.get("rows", []))
 
         self.rowcount = len(self._last_response.get("rows", []))

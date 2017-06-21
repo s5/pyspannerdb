@@ -92,7 +92,7 @@ def parse_sql(sql, params):
             bracketed_list = []
             for i in range(start, len(parts)):
                 if parts[i].endswith(")"):
-                    remainder = parts[i].rstrip(")").strip()
+                    remainder = parts[i].lstrip("(").rstrip(")").strip()
                     if remainder:
                         bracketed_list.append(remainder)
                     break

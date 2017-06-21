@@ -9,6 +9,10 @@ class FakeOperationOK(object):
     status_code = 200
     content = '{"done": true}'
 
+class FakeInsertOK(object):
+    status_code = 200
+    content = '{"id": "1234"}'
+
 
 class TestDDLOperations(TestCase):
     def __init__(self, *args, **kwargs):
@@ -83,6 +87,30 @@ class TestCustomQueries(TestCase):
     def test_show_ddl(self):
         pass
 
+
+class TestInsertOperations(TestCase):
+
+    def test_insert_returns_id(self):
+        self.connection._pk_lookup["test"] = "id"
+
+        with sleuth.fake("pyspannerdb.fetch.fetch", return_value=FakeInsertOK()) as fetch:
+            with self.connection.cursor() as cursor:
+                cursor.execute("INSERT INTO test (field) VALUES (%s)", [1])
+
+                self.assertTrue(fetch.called)
+
+                data = json.loads(fetch.calls[1].kwargs["payload"])
+                self.assertEqual(1, len(data["mutations"]))
+                m0 = data["mutations"][0]
+
+                self.assertTrue("insert" in m0)
+                insert = m0["insert"]
+
+                self.assertEqual("test", insert["table"])
+                self.assertEqual([[str(cursor.lastrowid), str(1)]], insert["values"])
+                self.assertEqual(["id", "field"], insert["columns"])
+
+                self.assertIsNotNone(cursor.lastrowid)
 
 class TestSelectOperations(TestCase):
 

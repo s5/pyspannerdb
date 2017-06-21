@@ -167,8 +167,10 @@ AND IC.TABLE_SCHEMA = ''
             m['columns'].insert(0, pk_column)
 
             for row in m['values']:
+                self._lastrowid = self._sequence_generator()
+
                 # INT64 must be sent as a string :(
-                row.insert(0, six.text_type(self._sequence_generator()))
+                row.insert(0, six.text_type(self._lastrowid))
 
         return mutation
 
@@ -369,8 +371,14 @@ AND IC.TABLE_SCHEMA = ''
 
             mutation = self._parse_mutation(sql, params, types)
             mutation = self._generate_pk_for_insert(mutation)
-
             self._transaction_mutations.append(mutation)
+
+            # This will be set by _generate_pk_for_insert if necessary
+            # we store it in a custom field in the result so the cursor
+            # can access it
+            if self._lastrowid is not None:
+                result["_lastrowid"] = self._lastrowid
+                self._lastrowid = None
 
         if transaction_id:
             # Keep the current transaction id active
@@ -381,7 +389,6 @@ AND IC.TABLE_SCHEMA = ''
             self.commit()
 
         return result
-
 
     def _send_request(self, url, data, method="POST"):
         def get_method():
@@ -435,6 +442,7 @@ AND IC.TABLE_SCHEMA = ''
 
         self._transaction_mutations = []
         self._transaction_id = None
+        self._schema_operations = []
 
     def rollback(self):
         pass
