@@ -11,6 +11,11 @@ of caveats - so please make sure you read this README before using it
  - Implement session destruction
  - Write a bunch more tests
  - Package for PyPI
+ - Make the query parser less dumb
+ - Make the pk_lookup table thread-local rather than per-connection (for performance)
+ - Properly wrap errors
+ - Gracefully handle deadline errors
+ - Allow disabling ID generation altogether
 
 ## Cloud Spanner is Weird
 
