@@ -64,6 +64,19 @@ class TestDDLOperations(TestCase):
 
 class TestCustomQueries(TestCase):
 
+    def test_readonly_transaction(self):
+        self.connection.autocommit(False) # Disable auto-commit
+
+        with sleuth.fake("pyspannerdb.fetch.fetch", return_value=FakeOperationOK()) as fetch:
+            with self.connection.cursor() as cursor:
+                cursor.execute("START TRANSACTION READONLY")
+
+                self.assertTrue(fetch.called)
+                data = json.loads(fetch.calls[0].kwargs["payload"])
+                self.assertEqual("SELECT 1", data["sql"])
+                self.assertEqual("readOnly", data["transaction"]["begin"].keys()[0])
+
+
     def test_show_index_from(self):
         pass
 

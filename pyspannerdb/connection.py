@@ -210,10 +210,7 @@ AND IC.TABLE_SCHEMA = ''
         return response
 
     def _send_ddl_update(self, sql):
-        print(sql)
-
         assert(_determine_query_type(sql) == QueryType.DDL)
-
 
         for statement in split_sql_on_semi_colons(sql):
             self._schema_operations.append(statement)
@@ -238,13 +235,13 @@ AND IC.TABLE_SCHEMA = ''
             Exposes some functionality of Spanner via custom SQL
             to make it accessible
         """
-        regex = re.compile(
-            "\s*CREATE\s+TABLE\s+(?P<table>[a-zA-Z0-9_-]+)|"
-            "\s*CREATE\s+(UNIQUE\s+)?INDEX\s+(?P<index>[a-zA-Z0-9_-]+)"
-        )
-
         sql = sql.strip()
         if sql.upper().startswith("SHOW DDL"):
+            regex = re.compile(
+                "\s*CREATE\s+TABLE\s+(?P<table>[a-zA-Z0-9_-]+)|"
+                "\s*CREATE\s+(UNIQUE\s+)?INDEX\s+(?P<index>[a-zA-Z0-9_-]+)"
+            )
+
             obj = sql[len("SHOW DDL"):].strip()
             url_params = self.url_params()
 
@@ -309,9 +306,17 @@ AND IC.TABLE_SCHEMA = ''
 
         # Before we do anything, deal with CUSTOM and DDL queries
         query_type = _determine_query_type(data["sql"])
-
+        transaction_type = None
         if query_type == QueryType.CUSTOM:
-            return self._run_custom_query(sql, params, types)
+            # Special case flag for forcing a readOnly transaction
+            if "START TRANSACTION READONLY" in sql.upper():
+                # Force a readOnly transaction, and run a dummy query
+                # to start it
+                transaction_type = "readOnly"
+                data["sql"] = "SELECT 1"
+                query_type = QueryType.READ
+            else:
+                return self._run_custom_query(sql, params, types)
         elif query_type == QueryType.DDL:
             response = self._send_ddl_update(sql)
             if self._autocommit:
@@ -326,14 +331,14 @@ AND IC.TABLE_SCHEMA = ''
             if self._autocommit:
                 # Autocommit means this is a single-use transaction, however passing singleUse
                 # to executeSql is apparently illegal... for some reason?
-                transaction_type = (
+                transaction_type = transaction_type or (
                     "readOnly" if query_type == QueryType.READ else "readWrite"
                 )
             else:
                 # If autocommit is disabled, we have to assume a readWrite transaction
                 # as even if the query type is READ, subsequent queries within the transaction
                 # may include UPDATEs
-                transaction_type = "readWrite"
+                transaction_type = transaction_type or "readWrite"
 
             # Begin a transaction as part of this query if we are autocommitting
             data["transaction"] = {"begin": {transaction_type: {}}}
@@ -350,7 +355,7 @@ AND IC.TABLE_SCHEMA = ''
             )
 
             transaction_id = result.get("transaction", {}).get("id")
-        else:
+        elif query_type == QueryType.WRITE:
             if not self._transaction_id:
                 # Start a new transaction, but store the mutation for the commit
                 result = self._send_request(
@@ -421,8 +426,6 @@ AND IC.TABLE_SCHEMA = ''
 
         if not self._transaction_id:
             return
-
-        print(self._transaction_mutations)
 
         self._send_request(
             ENDPOINT_COMMIT.format(**self.url_params()), {

@@ -50,6 +50,9 @@ def _determine_query_type(sql):
         # Special case for our custom SHOW DDL command
         return QueryType.CUSTOM
 
+    if sql.upper().startswith("START TRANSACTION"):
+        return QueryType.CUSTOM
+
     if sql.upper().startswith("SHOW INDEX"):
         # Special case
         return QueryType.CUSTOM
