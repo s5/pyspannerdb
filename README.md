@@ -16,6 +16,7 @@ of caveats - so please make sure you read this README before using it
  - Properly wrap errors
  - Gracefully handle deadline errors
  - Allow disabling ID generation altogether
+ - Fix case sensitivity issues (all keywords are currently expected to be uppercase)
 
 ## Cloud Spanner is Weird
 
