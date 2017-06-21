@@ -6,7 +6,7 @@ of caveats - so please make sure you read this README before using it
 
 ## TODO
 
- - Implement support for DELETE and REPLACE
+ - Implement support for REPLACE
  - Implement transaction rollback
  - Implement session destruction
  - Write a bunch more tests
