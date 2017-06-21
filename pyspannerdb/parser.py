@@ -3,6 +3,9 @@ import datetime
 from pytz import utc
 import six
 
+from .errors import NotSupportedError
+
+
 RESERVED_WORDS = ('ALL', 'AND', 'ANY', 'ARRAY', 'AS', 'ASC', 'ASSERT_ROWS_MODIFIED', 'AT', 'BETWEEN', 'BY', 'CASE', 'CAST', 'COLLATE', 'CONTAINS', 'CREATE', 'CROSS', 'CUBE', 'CURRENT', 'DEFAULT', 'DEFINE', 'DESC', 'DISTINCT', 'ELSE', 'END', 'ENUM', 'ESCAPE', 'EXCEPT', 'EXCLUDE', 'EXISTS', 'EXTRACT', 'FALSE', 'FETCH', 'FOLLOWING', 'FOR', 'FROM', 'FULL', 'GROUP', 'GROUPING', 'GROUPS', 'HASH', 'HAVING', 'IF', 'IGNORE', 'IN', 'INNER', 'INTERSECT', 'INTERVAL', 'INTO', 'IS', 'JOIN', 'LATERAL', 'LEFT', 'LIKE', 'LIMIT', 'LOOKUP', 'MERGE', 'NATURAL', 'NEW', 'NO', 'NOT', 'NULL', 'NULLS', 'OF', 'ON', 'OR', 'ORDER', 'OUTER', 'OVER', 'PARTITION', 'PRECEDING', 'PROTO', 'RANGE', 'RECURSIVE', 'RESPECT', 'RIGHT', 'ROLLUP', 'ROWS', 'SELECT', 'SET', 'SOME', 'STRUCT', 'TABLESAMPLE', 'THEN', 'TO', 'TREAT', 'TRUE', 'UNBOUNDED', 'UNION', 'UNNEST', 'USING', 'WHEN', 'WHERE', 'WINDOW', 'WITH', 'WITHIN',
 'INSERT', 'DELETE', 'REPLACE', 'UPDATE', 'VALUES' # This row is surely an oversight... had to add them, not in the docs
 )
@@ -22,7 +25,10 @@ class ParsedSQLInfo(object):
         self.row_values = []
 
     def _add_row(self, values):
-        self.row_values.append(values)
+        if self.method == "DELETE":
+            self.row_values.extend(values)
+        else:
+            self.row_values.append(values)
 
 
 def _convert_for_json(values):
@@ -144,13 +150,22 @@ def parse_sql(sql, params):
     class TokenNotFound(Exception):
         pass
 
-    def find_next(tok_type, start=0):
+    class NotProvided(object):
+        pass
+
+    def find_next(tok_type, start=0, value=NotProvided):
+        check_value = value is not NotProvided
+
         if not isinstance(tok_type, (list, tuple)):
             tok_type = tok_type
 
         for i in range(start, len(parts)):
             if parts[i][0] in tok_type:
-                return i
+                if check_value:
+                    if value == parts[i][1]:
+                        return i
+                else:
+                    return i
 
         raise TokenNotFound()
 
@@ -220,6 +235,30 @@ def parse_sql(sql, params):
             except TokenNotFound:
                 break
         rows = [row]
+    elif method == "DELETE":
+        table = parts[2][1]
+
+        where = find_next(Token.KEYWORD, value="WHERE")
+        column_idx = find_next(Token.NAME, where)
+        operator_idx = find_next((Token.OPERATOR, Token.KEYWORD), column_idx)
+
+        columns = [parts[column_idx][1]]
+        operator = parts[operator_idx][1]
+
+        values = []
+        if operator == "IN":
+            lbracket = find_next(Token.LBRACKET, operator_idx)
+            for i, token in iterate_until(Token.RBRACKET, lbracket):
+                if token[0] == Token.NAME:
+                    values.append(token[1])
+
+        elif operator == "=":
+            value = find_next(Token.NAME, operator_idx)
+            values.append(parts[value][1])
+        else:
+            raise NotSupportedError("Can only delete on key equalities (e.g. IN or =)")
+
+        rows = [values]
     else:
         raise NotImplementedError()
 

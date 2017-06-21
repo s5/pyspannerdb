@@ -110,6 +110,46 @@ class TestUpdateOperations(TestCase):
                 self.assertEqual(["field1", "field2"], update["columns"])
 
 
+class TestDeleteOperations(TestCase):
+
+    def test_basic_delete(self):
+        sql = "DELETE FROM test WHERE field1 = %s"
+
+        with sleuth.fake("pyspannerdb.fetch.fetch", return_value=FakeInsertOK()) as fetch:
+            with self.connection.cursor() as cursor:
+                cursor.execute(sql, [1])
+
+                self.assertTrue(fetch.called)
+
+                data = json.loads(fetch.calls[1].kwargs["payload"])
+                self.assertEqual(1, len(data["mutations"]))
+                m0 = data["mutations"][0]
+
+                self.assertTrue("delete" in m0)
+                delete = m0["delete"]
+
+                self.assertEqual("test", delete["table"])
+                self.assertEqual([str(1)], delete["keySet"])
+
+    def test_multi_delete(self):
+        sql = "DELETE FROM test WHERE field1 IN (%s, %s)"
+
+        with sleuth.fake("pyspannerdb.fetch.fetch", return_value=FakeInsertOK()) as fetch:
+            with self.connection.cursor() as cursor:
+                cursor.execute(sql, [1, 2])
+
+                self.assertTrue(fetch.called)
+
+                data = json.loads(fetch.calls[1].kwargs["payload"])
+                self.assertEqual(1, len(data["mutations"]))
+                m0 = data["mutations"][0]
+
+                self.assertTrue("delete" in m0)
+                delete = m0["delete"]
+
+                self.assertEqual("test", delete["table"])
+                self.assertEqual([str(1), str(2)], delete["keySet"])
+
 class TestInsertOperations(TestCase):
 
     def test_insert_returns_id(self):

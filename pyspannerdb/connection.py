@@ -136,6 +136,14 @@ AND IC.TABLE_SCHEMA = ''
 
         parsed_output = parse_sql(sql, params)
 
+        if parsed_output.method == "DELETE":
+            return {
+                "delete": {
+                    "table": parsed_output.table,
+                    "keySet": parsed_output.row_values
+                }
+            }
+
         return {
             parsed_output.method.lower(): {
                 "table": parsed_output.table,
