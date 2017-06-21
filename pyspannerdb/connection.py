@@ -25,6 +25,28 @@ from .parser import (
 )
 
 
+def split_sql_on_semi_colons(sql):
+    inside_quotes = False
+
+    results = []
+    buff = []
+
+    for c in sql:
+        if c in ("'", '"', "`"):
+            inside_quotes = not inside_quotes
+
+        if c == ";" and not inside_quotes:
+            results.append("".join(buff))
+            buff = []
+        else:
+            buff.append(c)
+
+    if buff:
+        results.append("".join(buff))
+
+    return results
+
+
 class Connection(object):
     def __init__(self, project_id, instance_id, database_id, auth_token):
         self.project_id = project_id
@@ -32,10 +54,13 @@ class Connection(object):
         self.database_id = database_id
         self.auth_token = auth_token
         self._autocommit = False
+
         self._transaction_id = None
         self._transaction_mutations = []
+        self._schema_operations = []
+
         self._session = self._create_session()
-        self._pk_lookup = self._query_pk_lookup()
+        self._pk_lookup = {}
 
         half_sixty_four = ((2 ** 64) - 1) / 2
 
@@ -150,37 +175,15 @@ AND IC.TABLE_SCHEMA = ''
     def _destroy_session(self, session_id):
         pass
 
-    def _run_ddl_update(self, sql, wait=True):
-        print(sql)
-
-        assert(_determine_query_type(sql) == QueryType.DDL)
+    def _apply_ddl_updates(self, wait=True):
+        if not self._schema_operations:
+            return
 
         # Operation IDs must start with a letter
         operation_id = "x" + uuid.uuid4().hex.replace("-", "_")
 
-        def split_sql_on_semi_colons(_sql):
-            inside_quotes = False
-
-            results = []
-            buff = []
-
-            for c in sql:
-                if c in ("'", '"', "`"):
-                    inside_quotes = not inside_quotes
-
-                if c == ";" and not inside_quotes:
-                    results.append("".join(buff))
-                    buff = []
-                else:
-                    buff.append(c)
-
-            if buff:
-                results.append("".join(buff))
-
-            return results
-
         data = {
-            "statements": split_sql_on_semi_colons(sql),
+            "statements": self._schema_operations,
             "operationId": operation_id
         }
 
@@ -202,12 +205,32 @@ AND IC.TABLE_SCHEMA = ''
                     ENDPOINT_OPERATION_GET.format(**params), data=None, method="GET"
                 )
                 done = status.get("done", False)
-                time.sleep(0.1)
+                time.sleep(0.25)
+
+        return response
+
+    def _send_ddl_update(self, sql):
+        print(sql)
+
+        assert(_determine_query_type(sql) == QueryType.DDL)
+
+
+        for statement in split_sql_on_semi_colons(sql):
+            self._schema_operations.append(statement)
 
         # Make sure we have some stub field information for the cursor to pick up
         # at the moment it is empty, but we should probably do whatever MySQL returns if you
         # do a CREATE TABLE or something
-        response.setdefault('metadata', {}).setdefault('rowType', {}).setdefault('fields', [])
+        response = {
+            'metadata': {
+                'rowType': {
+                    'fields': []
+                }
+            },
+            'rows': [
+            ]
+        }
+
         return response
 
     def _run_custom_query(self, sql, params, types):
@@ -284,10 +307,17 @@ AND IC.TABLE_SCHEMA = ''
                 "paramTypes": types
             })
 
+        # Before we do anything, deal with CUSTOM and DDL queries
         query_type = _determine_query_type(data["sql"])
 
         if query_type == QueryType.CUSTOM:
             return self._run_custom_query(sql, params, types)
+        elif query_type == QueryType.DDL:
+            response = self._send_ddl_update(sql)
+            if self._autocommit:
+                self.commit()
+            return response
+
 
         # If we're running a query, with no active transaction then start a transaction
         # as part of this query. We use readWrite if it's an INSERT or UPDATE or CREATE or whatever
@@ -384,6 +414,11 @@ AND IC.TABLE_SCHEMA = ''
         self._session = None
 
     def commit(self):
+        # Apply any outstanding schema operations before
+        # applying any readWrite transactions
+        if self._schema_operations:
+            self._apply_ddl_updates()
+
         if not self._transaction_id:
             return
 

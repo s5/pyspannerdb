@@ -14,11 +14,14 @@ except ImportError:
     ):
         "Stub implementation of Google's urlfetch.fetch for compatibility with GAE"
 
+        if not follow_redirects or allow_truncated or validate_certificate:
+            raise NotImplementedError()
+
         import urllib2
         opener = urllib2.build_opener(urllib2.HTTPHandler)
         request = urllib2.Request(url, data=payload)
-        for k, v in headers:
+        for k, v in headers.items():
             request.add_header(k, v)
         request.get_method = lambda: method
-        return opener.open(request)
+        return opener.open(request, timeout=deadline)
 

@@ -14,6 +14,12 @@ class Cursor(object):
         self.rowcount = -1
         self.description = None
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        self.close()
+
     @property
     def lastrowid(self):
         return self._lastrowid
@@ -59,12 +65,8 @@ class Cursor(object):
 
         sql, params, types = self._format_query(sql, params)
 
-        query_type = _determine_query_type(sql)
-        if query_type == QueryType.DDL:
-            self._last_response = self.connection._run_ddl_update(sql)
-        else:
-            self._last_response = self.connection._run_query(sql, params, types)
-            self._iterator = iter(self._last_response.get("rows", []))
+        self._last_response = self.connection._run_query(sql, params, types)
+        self._iterator = iter(self._last_response.get("rows", []))
 
         self.rowcount = len(self._last_response.get("rows", []))
         if 'metadata' in self._last_response:
