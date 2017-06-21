@@ -58,6 +58,7 @@ class Connection(object):
         self._transaction_id = None
         self._transaction_mutations = []
         self._schema_operations = []
+        self._lastrowid = None
 
         self._session = self._create_session()
         self._pk_lookup = {}

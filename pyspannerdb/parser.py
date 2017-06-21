@@ -3,6 +3,9 @@ import datetime
 from pytz import utc
 import six
 
+RESERVED_WORDS = ('ALL', 'AND', 'ANY', 'ARRAY', 'AS', 'ASC', 'ASSERT_ROWS_MODIFIED', 'AT', 'BETWEEN', 'BY', 'CASE', 'CAST', 'COLLATE', 'CONTAINS', 'CREATE', 'CROSS', 'CUBE', 'CURRENT', 'DEFAULT', 'DEFINE', 'DESC', 'DISTINCT', 'ELSE', 'END', 'ENUM', 'ESCAPE', 'EXCEPT', 'EXCLUDE', 'EXISTS', 'EXTRACT', 'FALSE', 'FETCH', 'FOLLOWING', 'FOR', 'FROM', 'FULL', 'GROUP', 'GROUPING', 'GROUPS', 'HASH', 'HAVING', 'IF', 'IGNORE', 'IN', 'INNER', 'INTERSECT', 'INTERVAL', 'INTO', 'IS', 'JOIN', 'LATERAL', 'LEFT', 'LIKE', 'LIMIT', 'LOOKUP', 'MERGE', 'NATURAL', 'NEW', 'NO', 'NOT', 'NULL', 'NULLS', 'OF', 'ON', 'OR', 'ORDER', 'OUTER', 'OVER', 'PARTITION', 'PRECEDING', 'PROTO', 'RANGE', 'RECURSIVE', 'RESPECT', 'RIGHT', 'ROLLUP', 'ROWS', 'SELECT', 'SET', 'SOME', 'STRUCT', 'TABLESAMPLE', 'THEN', 'TO', 'TREAT', 'TRUE', 'UNBOUNDED', 'UNION', 'UNNEST', 'USING', 'WHEN', 'WHERE', 'WINDOW', 'WITH', 'WITHIN',
+'INSERT', 'DELETE', 'REPLACE', 'UPDATE', 'VALUES' # This row is surely an oversight... had to add them, not in the docs
+)
 
 class QueryType:
     DDL = "DDL"
@@ -76,53 +79,151 @@ def parse_sql(sql, params):
         Parses a restrictive subset of SQL for "write" queries (INSERT, UPDATE etc.)
     """
 
-    parts = sql.split()
+    class Token:
+        COMMA = "COMMA"
+        LBRACKET = "LBRACKET"
+        RBRACKET = "RBRACKET"
+        OPERATOR = "OPERATOR"
+        KEYWORD = "KEYWORD"
+        NAME = "NAME"
 
-    method = parts[0].upper().strip()
+    def tokenize(sql):
+        sql = sql.strip()
+        opening_quote = None
+        in_quotes = lambda: opening_quote is not None
+
+        tokens = []
+        buff = []
+
+        def push_buff(buff, tok=None):
+            if not buff:
+                return
+
+            word = "".join(buff)
+            if not tok:
+                tok = Token.KEYWORD if word.upper() in RESERVED_WORDS else Token.NAME
+            tokens.append((tok, word))
+            buff[:] = []
+
+        for c in sql:
+            if c in (" ", "\t", "\n") and not in_quotes():
+                push_buff(buff)
+                continue # Ignore whitespace
+
+            if c in ("'", '"', "`"):
+                opening_quote = c
+                continue
+            elif c == opening_quote:
+                opening_quote = None
+                continue
+
+            if c == "(" and not in_quotes():
+                push_buff(buff)
+                buff.append(c)
+                push_buff(buff, Token.LBRACKET)
+            elif c == ")" and not in_quotes():
+                push_buff(buff)
+                buff.append(c)
+                push_buff(buff, Token.RBRACKET)
+            elif c == "," and not in_quotes():
+                push_buff(buff)
+                buff.append(c)
+                push_buff(buff, Token.COMMA)
+            elif c in ("<", ">", "<=", ">=", "=", "^", "-", "+", "/", "%", "*") and not in_quotes():
+                push_buff(buff)
+                buff.append(c)
+                push_buff(buff, Token.OPERATOR)
+            else:
+                buff.append(c)
+        push_buff(buff)
+
+        return tokens
+
+    parts = tokenize(sql)
+
+    class TokenNotFound(Exception):
+        pass
+
+    def find_next(tok_type, start=0):
+        if not isinstance(tok_type, (list, tuple)):
+            tok_type = tok_type
+
+        for i in range(start, len(parts)):
+            if parts[i][0] in tok_type:
+                return i
+
+        raise TokenNotFound()
+
+    def iterate_until(tok_type, start=0):
+        for i in range(start, len(parts)):
+            if parts[i][0] == tok_type:
+                raise StopIteration()
+            else:
+                yield i, parts[i]
+        else:
+            raise TokenNotFound()
+
+    assert(parts[0][0] == Token.KEYWORD)
+    method = parts[0][1].upper()
     table = None
     columns = []
 
     rows = []
 
     if method == "INSERT":
-        assert(parts[1].upper() == "INTO")
-        table = parts[2]
+        assert(parts[2][0] == Token.NAME)
+        table = parts[2][1]
 
-        def parse_bracketed_list_from(start):
-            bracketed_list = []
-            for i in range(start, len(parts)):
-                if parts[i].endswith(")"):
-                    remainder = parts[i].lstrip("(").rstrip(")").strip()
-                    if remainder:
-                        bracketed_list.append(remainder)
-                    break
+        start = find_next(Token.LBRACKET) # Find the column list
 
-                remainder = parts[i].lstrip("(").strip()
-                # Depending on whether there was whitespace before/after brackets/commas
-                # remainder will either be a column, or a CSV of columns
-                if "," in remainder:
-                    bracketed_list.extend([x.strip() for x in remainder.split(",") if x.strip()])
-                elif remainder:
-                    bracketed_list.append(remainder)
+        columns = []
+        for i, token in iterate_until(Token.RBRACKET, start):
+            if token[0] == Token.NAME:
+                columns.append(token[1])
 
-            return bracketed_list, i
-
-        columns, last = parse_bracketed_list_from(3)
-
-        assert(parts[last + 1] == "VALUES")
-
-        start = last + 2
+        rows = []
+        start = i
         while start < len(parts):
-            row, last = parse_bracketed_list_from(start)
-            rows.append(row)
-            start = last + 1
+            try:
+                start = find_next(Token.LBRACKET, start)
+                row = []
 
+                for j, token in iterate_until(Token.RBRACKET, start):
+                    if token[0] == Token.NAME:
+                        row.append(token[1])
+            except TokenNotFound:
+                break
+
+            rows.append(row)
+            start = j + 1
+
+    elif method == "UPDATE":
+        table = parts[1][1]
+
+        start = 2
+        columns = []
+        row = []
+        while start < len(parts):
+            try:
+                while True:
+                    i = find_next((Token.KEYWORD, Token.COMMA), start)
+                    if parts[i][1] in ("SET", ","):
+                        break
+
+                field_idx = find_next(Token.NAME, i)
+                value_id = find_next(Token.NAME, field_idx + 1)
+
+                columns.append(parts[field_idx][1])
+                row.append(parts[value_id][1])
+
+                start = i + 1
+            except TokenNotFound:
+                break
+        rows = [row]
     else:
         raise NotImplementedError()
 
     # Remove any backtick quoting
-    table = table.strip("`")
-    columns = [x.strip("`") for x in columns]
     result = ParsedSQLInfo(method, table, columns)
 
     for value_list in rows:

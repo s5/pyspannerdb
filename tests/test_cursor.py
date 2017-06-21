@@ -88,6 +88,28 @@ class TestCustomQueries(TestCase):
         pass
 
 
+class TestUpdateOperations(TestCase):
+    def test_basic_update(self):
+        sql = "UPDATE test SET field1 = %s, field2 = %s"
+
+        with sleuth.fake("pyspannerdb.fetch.fetch", return_value=FakeInsertOK()) as fetch:
+            with self.connection.cursor() as cursor:
+                cursor.execute(sql, [1, 2])
+
+                self.assertTrue(fetch.called)
+
+                data = json.loads(fetch.calls[1].kwargs["payload"])
+                self.assertEqual(1, len(data["mutations"]))
+                m0 = data["mutations"][0]
+
+                self.assertTrue("update" in m0)
+                update = m0["update"]
+
+                self.assertEqual("test", update["table"])
+                self.assertEqual([[str(1), str(2)]], update["values"])
+                self.assertEqual(["field1", "field2"], update["columns"])
+
+
 class TestInsertOperations(TestCase):
 
     def test_insert_returns_id(self):

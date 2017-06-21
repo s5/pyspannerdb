@@ -6,7 +6,7 @@ of caveats - so please make sure you read this README before using it
 
 ## TODO
 
- - Implement support for UPDATE, DELETE and REPLACE
+ - Implement support for DELETE and REPLACE
  - Implement transaction rollback
  - Implement session destruction
  - Write a bunch more tests
@@ -34,6 +34,7 @@ making a DB API compatible connector (currently) is a bit of a hack. Problematic
    you start a transaction
  - Some queries (e.g. information schema) will not work inside a readWrite transaction
  - There's no such thing as auto-increment or automatic IDs (more on that later)
+ - UPDATE .. WHERE .. isn't supported. The specified columns must include the primary key columns
  
 This all makes writing a generic SQL-based connector difficult, so there are the following caveats when using this:
 
