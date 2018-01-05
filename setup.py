@@ -36,5 +36,5 @@ setup(
 
     include_package_data=True,
     # dependencies
-    extras_require=REQUIREMENTS
+    extras_require={ 'all' : REQUIREMENTS }
 )
