@@ -222,13 +222,17 @@ def parse_sql(sql, params):
             try:
                 while True:
                     i = find_next((Token.KEYWORD, Token.COMMA), start)
-                    if parts[i][1] in ("SET", ","):
+                    if parts[i][1] in ("SET", ",", "WHERE"):
                         break
 
                 field_idx = find_next(Token.NAME, i)
                 value_id = find_next(Token.NAME, field_idx + 1)
 
-                columns.append(parts[field_idx][1])
+                _field = parts[field_idx][1]
+                if "." in _field:
+                  _field = _field.split('.')[1]
+
+                columns.append(_field)
                 row.append(parts[value_id][1])
 
                 start = i + 1
