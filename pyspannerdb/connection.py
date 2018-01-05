@@ -414,10 +414,10 @@ AND IC.TABLE_SCHEMA = ''
                 'Content-Type': 'application/json'
             }
         )
-        if not str(response.status_code).startswith("2"):
+        if not str(response.getcode()).startswith("2"):
             raise DatabaseError("Error sending database request: {}".format(response.content))
 
-        return json.loads(response.content)
+        return json.loads(response.read())
 
 
     def autocommit(self, value):

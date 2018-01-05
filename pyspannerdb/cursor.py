@@ -45,7 +45,7 @@ class Cursor(object):
 
             # Replace the next %s with a placeholder
             placeholder = "@{}".format(letter)
-            sql = sql.replace("%s", placeholder, 1)
+            sql = sql.replace("?", placeholder, 1)
 
             if isinstance(val, six.text_type):
                 param_types[letter] = {"code": "STRING"}
