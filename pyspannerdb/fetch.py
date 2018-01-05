@@ -10,7 +10,7 @@ except ImportError:
 
     def fetch(
         url, payload=None, method=1, headers={}, allow_truncated=False,
-        follow_redirects=True, deadline=None, validate_certificate=None
+        follow_redirects=True, deadline=None, validate_certificate=None, debug=False
     ):
         "Stub implementation of Google's urlfetch.fetch for compatibility with GAE"
 
@@ -18,7 +18,11 @@ except ImportError:
             raise NotImplementedError()
 
         import urllib2
-        opener = urllib2.build_opener(urllib2.HTTPHandler)
+        if debug:
+          handler = urllib2.HTTPHandler()
+        else:
+          handler = urllib2.HTTPSHandler(debuglevel=1)
+        opener = urllib2.build_opener(handler)
         request = urllib2.Request(url, data=payload)
         for k, v in headers.items():
             request.add_header(k, v)

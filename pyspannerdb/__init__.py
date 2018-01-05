@@ -10,7 +10,7 @@ except ImportError:
     ON_GAE = False
 
 
-def connect(project_id, instance_id, database_id, credentials_json=None):
+def connect(project_id, instance_id, database_id, credentials_json=None, debug=False):
     if not credentials_json:
         if ON_GAE:
             auth_token, _ = app_identity.get_access_token(
@@ -26,5 +26,5 @@ def connect(project_id, instance_id, database_id, credentials_json=None):
         auth_token = access_token_info.access_token
 
     return Connection(
-        project_id, instance_id, database_id, auth_token
+        project_id, instance_id, database_id, auth_token, debug=debug
     )

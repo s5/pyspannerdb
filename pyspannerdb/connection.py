@@ -48,12 +48,13 @@ def split_sql_on_semi_colons(sql):
 
 
 class Connection(object):
-    def __init__(self, project_id, instance_id, database_id, auth_token):
+    def __init__(self, project_id, instance_id, database_id, auth_token, debug=False):
         self.project_id = project_id
         self.instance_id = instance_id
         self.database_id = database_id
         self.auth_token = auth_token
         self._autocommit = False
+        self.debug = debug
 
         self._transaction_id = None
         self._transaction_mutations = []
@@ -412,7 +413,8 @@ AND IC.TABLE_SCHEMA = ''
             headers={
                 'Authorization': 'Bearer {}'.format(self.auth_token),
                 'Content-Type': 'application/json'
-            }
+            },
+            debug=self.debug
         )
         if not str(response.getcode()).startswith("2"):
             raise DatabaseError("Error sending database request: {}".format(response.content))
