@@ -55,8 +55,8 @@ class Cursor(object):
                 param_types[letter] = {'code': 'INT64'}
                 output_params[letter] = six.text_type(val)
 
-        if params:
-            print("%s - %s" % (output_params, param_types))
+#         if params:
+#             print("%s - %s" % (output_params, param_types))
         return sql, output_params, param_types
 
 
