@@ -141,7 +141,9 @@ AND IC.TABLE_SCHEMA = ''
             return {
                 "delete": {
                     "table": parsed_output.table,
-                    "keySet": parsed_output.row_values
+                    "keySet": {
+                      "keys": [parsed_output.row_values]
+                    }
                 }
             }
 

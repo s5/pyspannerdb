@@ -1,5 +1,6 @@
 import six
 import string
+import datetime
 from .parser import QueryType, _determine_query_type
 
 
@@ -69,12 +70,27 @@ class Cursor(object):
         if "_lastrowid" in self._last_response:
             self._lastrowid = self._last_response["_lastrowid"]
 
+        for row in self._last_response.get("rows", []):
+          for i, val in enumerate(row):
+            code = self._last_response['metadata']['rowType']['fields'][i]['type']['code']
+            if row[i] is not None:
+              if code == 'INT64':
+                row[i] = int(row[i])
+              if code == 'TIMESTAMP':
+                try:
+                  row[i] = datetime.datetime.strptime(row[i], "%Y-%m-%dT%H:%M:%S.%fZ")
+                except ValueError:
+                  try:
+                    row[i] = datetime.datetime.strptime(row[i], "%Y-%m-%dT%H:%M:%SZ")
+                  except:
+                    pass
+
         self._iterator = iter(self._last_response.get("rows", []))
 
         self.rowcount = len(self._last_response.get("rows", []))
         if 'metadata' in self._last_response:
             self.description = [
-                (x['name'], x['type']['code'], None, None, None, None, None)
+                (x.get('name'), x['type']['code'], None, None, None, None, None)
                 for x in self._last_response['metadata']['rowType']['fields']
             ]
         else:
