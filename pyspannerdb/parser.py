@@ -37,10 +37,11 @@ def _convert_for_json(values):
         types (e.g. integers must be strings) so this takes care of converting
         Python types to the correct format for JSON
     """
-
     for i, value in enumerate(values):
 
-        if isinstance(value, six.integer_types):
+        if isinstance(value, bool):
+            values[i] = value         
+        elif isinstance(value, six.integer_types):
             values[i] = six.text_type(value) # Ints must be strings
         elif isinstance(value, six.binary_type):
             values[i] = base64.b64encode(value) # Bytes must be b64 encoded

@@ -48,7 +48,9 @@ class Cursor(object):
             placeholder = "@{}".format(letter)
             sql = sql.replace("?", placeholder, 1)
 
-            if isinstance(val, six.text_type):
+            if isinstance(val, bool):
+                param_types[letter] = {"code": "BOOLEAN"}
+            elif isinstance(val, six.text_type):
                 param_types[letter] = {"code": "STRING"}
             elif isinstance(val, six.binary_type):
                 param_types[letter] = {"code": "BYTES"}
