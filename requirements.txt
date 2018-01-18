@@ -1,2 +1,3 @@
 pytz
 git+https://github.com/Kazade/sleuth.git
+certifi

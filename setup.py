@@ -11,12 +11,13 @@ AUTHOR = 'Potato London Ltd.'
 
 REQUIREMENTS = [
     'six',
-    'pytz'
+    'pytz',
+    'certifi'
 ]
 
 setup(
     name=NAME,
-    version='0.6',
+    version='0.7',
     packages=PACKAGES,
 
     # metadata for upload to PyPI

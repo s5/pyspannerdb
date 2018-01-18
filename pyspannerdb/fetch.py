@@ -18,6 +18,7 @@ except ImportError:
             raise NotImplementedError()
 
         import urllib2
+        import certifi
         if debug:
           handler = urllib2.HTTPSHandler(debuglevel=1)        
         else:
@@ -27,5 +28,6 @@ except ImportError:
         for k, v in headers.items():
             request.add_header(k, v)
         request.get_method = lambda: method
-        return opener.open(request, timeout=deadline)
+        urllib2.install_opener(opener)        
+        return urllib2.urlopen(request, timeout=deadline, cafile=certifi.where())
 
