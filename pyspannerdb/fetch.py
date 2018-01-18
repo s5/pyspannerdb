@@ -19,6 +19,7 @@ except ImportError:
 
         import urllib2
         import certifi
+        import ssl        
         if debug:
           handler = urllib2.HTTPSHandler(debuglevel=1)        
         else:
@@ -29,5 +30,7 @@ except ImportError:
             request.add_header(k, v)
         request.get_method = lambda: method
         urllib2.install_opener(opener)        
-        return urllib2.urlopen(request, timeout=deadline, cafile=certifi.where())
+#         return urllib2.urlopen(request, timeout=deadline, cafile=certifi.where())
+        context = ssl._create_unverified_context()        
+        return urllib2.urlopen(request, timeout=deadline, context=context)
 
