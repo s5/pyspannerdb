@@ -17,7 +17,7 @@ REQUIREMENTS = [
 
 setup(
     name=NAME,
-    version='0.8',
+    version='0.9',
     packages=PACKAGES,
 
     # metadata for upload to PyPI
