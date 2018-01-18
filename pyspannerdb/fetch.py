@@ -21,7 +21,7 @@ except ImportError:
         if debug:
           handler = urllib2.HTTPSHandler(debuglevel=1)        
         else:
-          handler = urllib2.HTTPHandler()        
+          handler = urllib2.HTTPSHandler()        
         opener = urllib2.build_opener(handler)
         request = urllib2.Request(url, data=payload)
         for k, v in headers.items():
