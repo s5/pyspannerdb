@@ -24,7 +24,8 @@ except ImportError:
         else:
           handler = urllib2.HTTPSHandler()        
         opener = urllib2.build_opener(handler)
-        request = urllib2.Request(url, data=payload)
+        print payload
+        request = urllib2.Request(url, data=payload.encode('utf-8'))
         for k, v in headers.items():
             request.add_header(k, v)
         request.get_method = lambda: method
