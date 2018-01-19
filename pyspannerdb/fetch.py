@@ -19,13 +19,14 @@ except ImportError:
 
         import urllib2
         import certifi
+        import sys
         if debug:
           handler = urllib2.HTTPSHandler(debuglevel=1)        
         else:
           handler = urllib2.HTTPSHandler()        
         opener = urllib2.build_opener(handler)
-        print payload
-        request = urllib2.Request(url, data=payload.encode('utf-8'))
+        print >> sys.stderr, payload
+        request = urllib2.Request(url, data=payload.encode('utf-8') if payload else None)
         for k, v in headers.items():
             request.add_header(k, v)
         request.get_method = lambda: method
