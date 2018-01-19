@@ -26,6 +26,7 @@ except ImportError:
           handler = urllib2.HTTPSHandler()        
         opener = urllib2.build_opener(handler)
         print >> sys.stderr, payload
+        print >> sys.stderr, headers
         request = urllib2.Request(url, data=payload.encode('utf-8') if payload else None)
         for k, v in headers.items():
             request.add_header(k, v)
